@@ -2,6 +2,8 @@ package com.scc;
 
 
 import com.scc.dao.Userdao;
+import com.scc.model.user;
+import com.scc.ui.AccountManageMenu;
 
 import java.util.Scanner;
 
@@ -23,6 +25,7 @@ public static void main(String[] args){
 
     switch (choice) {
         case "1":
+            handleLogin();
             break;
         case "2":
             System.out.print("Enter new username:");
@@ -60,14 +63,29 @@ public static void main(String[] args){
                 System.out.println("Invalid identity selection!");
             }
 
-
-
             }
 
-
-
-
     }
+
+    private static void handleLogin() {
+        System.out.print("Enter username: ");
+        String username = sc.nextLine();
+        System.out.print("Enter Password: ");
+        String password = sc.nextLine();
+
+        user user = userDao.login(username, password);
+
+        if (user != null) {
+            System.out.println("\n -> Welcome " + user.username() + " | IDENTITY: " + user.identity());
+
+            switch (user.identity().toUpperCase()) {
+                case "ADMIN" -> new AccountManageMenu(userDao, sc).display(user);
+                default -> System.out.print("Account identity menu not found!");
+            }
+        }
+    }
+
+
 
 }
 
