@@ -15,7 +15,7 @@ public static final Scanner sc = new Scanner(System.in);
 public static void main(String[] args){
 
     System.out.println("\n================================");
-    System.out.println(" STUDENT RECORDS MANAGEMENT");
+    System.out.println(" SCHOOL CLINIC APPOINTMENT SYSTEM");
     System.out.println("================================");
     System.out.println("1. Login");
     System.out.println("2. Register");
