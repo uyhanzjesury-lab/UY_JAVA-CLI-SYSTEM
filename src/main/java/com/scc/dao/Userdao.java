@@ -6,6 +6,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Userdao {
 
@@ -33,7 +35,7 @@ public class Userdao {
         }
     }
 
-    public boolean registerUser(String username, String password, String identity) {
+    public static boolean registerUser(String username, String password, String identity) {
         String sql = "INSERT INTO users(username, password, identity, status) VALUES(?, ?, ?, ?)";
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement pstm = conn.prepareStatement(sql)) {
@@ -53,7 +55,7 @@ public class Userdao {
         }
     }
 
-    public user login(String username, String password) {
+    public static user login(String username, String password) {
         String sql = "SELECT id, username, password, identity, status FROM users WHERE username = ? AND password = ?";
 
         try (Connection conn = ClinicdatabaseConnection.getConnection();
@@ -74,7 +76,7 @@ public class Userdao {
                             rs.getString("username"),
                             rs.getString("password"),
                             rs.getString("identity"),
-                            status
+                            rs.getString("status")
                     );
                 } else {
                     System.out.println(" -> Invalid username or password");
@@ -86,4 +88,33 @@ public class Userdao {
         }
         return null;
     }
+
+    public List<user> getalltheuser() {
+        List<user> userList = new ArrayList<>();
+        String sql = "SELECT id, username, password, identity, status " +
+                "FROM users ";
+
+        try (Connection con = ClinicdatabaseConnection.getConnection();
+             Statement stmt = con.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                userList .add (new user(
+                 rs.getInt("id"),
+                 rs.getString("username"),
+                 rs.getString("password"),
+                 rs.getString("identity"),
+                 rs.getString("status")
+                ));
+
+
+            }
+        } catch (SQLException e) {
+            System.out.println("Error fetching users: " + e.getMessage());
+        }
+        return userList;
+    }
+
+
+
 }
