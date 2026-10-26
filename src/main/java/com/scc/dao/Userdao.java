@@ -13,7 +13,6 @@ import java.util.List;
 public class Userdao {
 
     public Userdao() {
-        // Ensure the users table exists before adding the default admin.
         DatabaseInitializer.initialize();
         try (Connection conn = ClinicdatabaseConnection.getConnection()) {
             defaultAdminGenerator(conn);
@@ -104,17 +103,14 @@ public class Userdao {
         }
     }
 
-    // Video functionality: return every registered user.
     public List<user> getAllUsers() {
         return getUsers("SELECT id, username, password, identity, status FROM users ORDER BY id");
     }
 
-    // Keeps compatibility with your original method name.
     public List<user> getalltheuser() {
         return getAllUsers();
     }
 
-    // Video functionality: return only accounts awaiting approval.
     public List<user> getPendingUsers() {
         return getUsers("SELECT id, username, password, identity, status FROM users WHERE UPPER(status) = 'PENDING' ORDER BY id");
     }
@@ -139,7 +135,6 @@ public class Userdao {
         return users;
     }
 
-    // Video functionality: approve only a pending account, using a parameterized ID.
     public boolean approveUser(int userId) {
         String sql = "UPDATE users SET status = 'APPROVED' WHERE id = ? AND UPPER(status) = 'PENDING'";
 
@@ -173,6 +168,29 @@ public class Userdao {
             return true;
         } catch (SQLException e) {
             System.err.println("Could not add user: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // Required update method using PreparedStatement without string concatenation
+    public boolean updateUserRoleAndStatus(int userId, String newRole, String newStatus) {
+        String sql = "UPDATE users SET identity = ?, status = ? WHERE id = ?";
+        try (Connection conn = ClinicdatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, newRole.trim().toUpperCase());
+            stmt.setString(2, newStatus.trim().toUpperCase());
+            stmt.setInt(3, userId);
+
+            int rowsUpdated = stmt.executeUpdate();
+            if (rowsUpdated > 0) {
+                System.out.println("User ID " + userId + " updated successfully.");
+                return true;
+            } else {
+                System.out.println("User ID not found.");
+                return false;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error updating user: " + e.getMessage());
             return false;
         }
     }
