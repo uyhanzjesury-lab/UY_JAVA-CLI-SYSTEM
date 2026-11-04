@@ -42,7 +42,8 @@ public class Authentication {
         System.out.print("Enter password: ");
         String password = scanner.nextLine();
 
-        System.out.println("Select identity: [1] Nurse [2] Clinic Staff [3] Registrar [4] Student");
+        // Added option [5] for School Faculty Staff
+        System.out.println("Select identity: [1] Nurse [2] Clinic Staff [3] Registrar [4] Student [5] School Faculty Staff");
         System.out.print("Choose identity: ");
         String value = scanner.nextLine().trim();
 
@@ -51,6 +52,7 @@ public class Authentication {
             case "2" -> "Clinic Staff";
             case "3" -> "Registrar";
             case "4" -> "Student";
+            case "5" -> "SCHOOL FACULTY STAFF";
             default -> null;
         };
 

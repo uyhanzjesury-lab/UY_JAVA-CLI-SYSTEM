@@ -6,7 +6,7 @@ import java.sql.Statement;
 
 public class DatabaseInitializer {
     public static void initialize() {
-        String sql = """
+        String usersSql = """
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT NOT NULL UNIQUE,
@@ -16,10 +16,22 @@ public class DatabaseInitializer {
                 )
                 """;
 
+        String logsSql = """
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    action_type TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """;
+
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              Statement stmt = conn.createStatement()) {
-            stmt.execute(sql);
-            System.out.println("-> Database table verified.");
+            stmt.execute(usersSql);
+            stmt.execute(logsSql);
+            System.out.println("-> Database tables verified.");
         } catch (SQLException e) {
             System.err.println("Could not initialize database: " + e.getMessage());
         }

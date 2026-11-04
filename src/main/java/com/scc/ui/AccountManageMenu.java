@@ -1,6 +1,8 @@
 package com.scc.ui;
 
+import com.scc.dao.ActivityLogDao;
 import com.scc.dao.Userdao;
+import com.scc.model.ActivityLog;
 import com.scc.model.user;
 
 import java.util.List;
@@ -8,10 +10,12 @@ import java.util.Scanner;
 
 public class AccountManageMenu {
     private final Userdao userdao;
+    private final ActivityLogDao logDao;
     private final Scanner scanner;
 
     public AccountManageMenu(Userdao userdao, Scanner scanner) {
         this.userdao = userdao;
+        this.logDao = new ActivityLogDao();
         this.scanner = scanner;
     }
 
@@ -28,19 +32,21 @@ public class AccountManageMenu {
             System.out.println("4. Add New User");
             System.out.println("5. Update User Role & Status");
             System.out.println("6. Delete User Account");
-            System.out.println("7. Logout");
-            System.out.print("Choose an option (1-7): ");
+            System.out.println("7. View System Audit Logs");
+            System.out.println("8. Logout");
+            System.out.print("Choose an option (1-8): ");
 
             String choice = scanner.nextLine().trim();
             switch (choice) {
                 case "1" -> viewAllUsers();
                 case "2" -> viewPendingUsers();
-                case "3" -> approveUser();
-                case "4" -> addUser();
+                case "3" -> approveUser(admin);
+                case "4" -> addUser(admin);
                 case "5" -> updateUserProcess(admin);
-                case "6" -> deleteUser();
-                case "7" -> loggedIn = false;
-                default -> System.out.println("Invalid option. Please choose 1-7.");
+                case "6" -> deleteUser(admin);
+                case "7" -> auditLogMenu();
+                case "8" -> loggedIn = false;
+                default -> System.out.println("Invalid option. Please choose 1-8.");
             }
         }
         System.out.println("Admin logged out.");
@@ -54,7 +60,7 @@ public class AccountManageMenu {
         displayTableUser(userdao.getPendingUsers(), "PENDING USER APPROVALS");
     }
 
-    private void approveUser() {
+    private void approveUser(user admin) {
         viewPendingUsers();
         int userId = readIntInput("Enter the ID to approve (0 to cancel): ");
 
@@ -62,15 +68,15 @@ public class AccountManageMenu {
             System.out.println("Approval cancelled.");
             return;
         }
-        userdao.approveUser(userId);
+        userdao.approveUser(userId, admin.id());
     }
 
-    private void addUser() {
+    private void addUser(user admin) {
         System.out.print("Enter username: ");
         String username = scanner.nextLine().trim();
         System.out.print("Enter password: ");
         String password = scanner.nextLine();
-        System.out.print("Enter identity (NURSE, CLINIC STAFF, REGISTRAR, STUDENT, ADMIN): ");
+        System.out.print("Enter identity (NURSE, CLINIC STAFF, REGISTRAR, STUDENT, SCHOOL FACULTY STAFF, ADMIN): ");
         String identity = scanner.nextLine().trim();
 
         if (username.isBlank() || password.isBlank() || identity.isBlank()) {
@@ -78,7 +84,7 @@ public class AccountManageMenu {
             return;
         }
 
-        if (userdao.addUserByAdmin(username, password, identity, "APPROVED")) {
+        if (userdao.addUserByAdmin(username, password, identity, "APPROVED", admin.id())) {
             System.out.println("User added and approved successfully.");
         }
     }
@@ -92,7 +98,6 @@ public class AccountManageMenu {
             return;
         }
 
-        // Self-Edit Restriction Warning Check
         if (userId == currentAdmin.id()) {
             System.out.println("WARNING: Modifying the currently active admin account is restricted.");
             return;
@@ -110,10 +115,68 @@ public class AccountManageMenu {
             return;
         }
 
-        userdao.updateUserRoleAndStatus(userId, newRole, newStatus);
+        userdao.updateUserRoleAndStatus(userId, newRole, newStatus, currentAdmin.id());
     }
 
-    // --- Exception-Safe Numeric Input Wrapper ---
+    private void deleteUser(user admin) {
+        viewAllUsers();
+        int id = readIntInput("Enter user ID to delete (0 to cancel): ");
+        if (id == 0) {
+            System.out.println("Deletion cancelled.");
+            return;
+        }
+
+        if (userdao.deleteUser(id, admin.id())) {
+            System.out.println("User account deleted.");
+        } else {
+            System.out.println("User was not found, or the administrator account cannot be deleted.");
+        }
+    }
+
+    private void auditLogMenu() {
+        boolean viewing = true;
+        while (viewing) {
+            System.out.println("\n=================================");
+            System.out.println("       SYSTEM AUDIT LOGS         ");
+            System.out.println("=================================");
+            System.out.println("1. View All System Logs");
+            System.out.println("2. Filter Logs by User ID");
+            System.out.println("3. Back to Admin Dashboard");
+            System.out.print("Choose an option (1-3): ");
+
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1" -> displayAuditLogs(logDao.getAllLogs(), "ALL SYSTEM AUDIT LOGS");
+                case "2" -> {
+                    int filterUserId = readIntInput("Enter User ID to filter by: ");
+                    displayAuditLogs(logDao.getLogsByUserId(filterUserId), "LOGS FOR USER ID: " + filterUserId);
+                }
+                case "3" -> viewing = false;
+                default -> System.out.println("Invalid option. Please choose 1, 2, or 3.");
+            }
+        }
+    }
+
+    private void displayAuditLogs(List<ActivityLog> logs, String title) {
+        System.out.println("\n================ " + title + " ================");
+        if (logs == null || logs.isEmpty()) {
+            System.out.println("No activity logs found.");
+            return;
+        }
+
+        System.out.printf("%-5s | %-8s | %-18s | %-35s | %-20s%n", "ID", "User ID", "Action Type", "Description", "Timestamp");
+        System.out.println("--------------------------------------------------------------------------------------------------------");
+        for (ActivityLog log : logs) {
+            System.out.printf("%-5d | %-8d | %-18s | %-35s | %-20s%n",
+                    log.id(),
+                    log.userId(),
+                    shorten(log.actionType(), 18),
+                    shorten(log.description(), 35),
+                    shorten(log.timestamp(), 20)
+            );
+        }
+    }
+
     private int readIntInput(String prompt) {
         while (true) {
             System.out.print(prompt);
@@ -128,14 +191,16 @@ public class AccountManageMenu {
 
     private String readValidRole() {
         while (true) {
-            System.out.print("Enter new role (STUDENT, TEACHER, ADMIN, NURSE, CLINIC STAFF, REGISTRAR) or 0 to cancel: ");
+            System.out.print("Enter new role (STUDENT, TEACHER, ADMIN, NURSE, CLINIC STAFF, REGISTRAR, SCHOOL FACULTY STAFF) or 0 to cancel: ");
             String role = scanner.nextLine().trim().toUpperCase();
 
             if (role.equals("0") || role.equals("CANCEL")) {
                 return null;
             }
+            // Added SCHOOL FACULTY STAFF validation check
             if (role.equals("STUDENT") || role.equals("TEACHER") || role.equals("ADMIN") ||
-                    role.equals("NURSE") || role.equals("CLINIC STAFF") || role.equals("REGISTRAR")) {
+                    role.equals("NURSE") || role.equals("CLINIC STAFF") || role.equals("REGISTRAR") ||
+                    role.equals("SCHOOL FACULTY STAFF")) {
                 return role;
             }
             System.out.println("Invalid role! Please enter a valid role option.");
@@ -154,21 +219,6 @@ public class AccountManageMenu {
                 return status;
             }
             System.out.println("Invalid status! Please enter APPROVED or PENDING.");
-        }
-    }
-
-    private void deleteUser() {
-        viewAllUsers();
-        int id = readIntInput("Enter user ID to delete (0 to cancel): ");
-        if (id == 0) {
-            System.out.println("Deletion cancelled.");
-            return;
-        }
-
-        if (userdao.deleteUser(id)) {
-            System.out.println("User account deleted.");
-        } else {
-            System.out.println("User was not found, or the administrator account cannot be deleted.");
         }
     }
 

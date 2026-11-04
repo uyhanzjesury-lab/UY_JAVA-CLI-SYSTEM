@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Userdao {
+    private final ActivityLogDao logDao = new ActivityLogDao();
 
     public Userdao() {
         DatabaseInitializer.initialize();
@@ -53,6 +54,7 @@ public class Userdao {
             stmt.setString(2, password);
             stmt.setString(3, identity.trim().toUpperCase());
             stmt.executeUpdate();
+
             System.out.println("Registration successful. Your account is PENDING admin approval.");
             return true;
         } catch (SQLException e) {
@@ -67,7 +69,9 @@ public class Userdao {
 
     public user login(String username, String password) {
         String sql = "SELECT id, username, password, identity, status FROM users WHERE username = ? AND password = ?";
+        user loggedInUser = null;
 
+        // Connection closes automatically here BEFORE logging
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, username.trim());
@@ -89,7 +93,7 @@ public class Userdao {
                     return null;
                 }
 
-                return new user(
+                loggedInUser = new user(
                         rs.getInt("id"),
                         rs.getString("username"),
                         rs.getString("password"),
@@ -101,14 +105,16 @@ public class Userdao {
             System.err.println("Error during login: " + e.getMessage());
             return null;
         }
+
+        // Safe to log now because the login connection is fully closed
+        if (loggedInUser != null) {
+            logDao.logAction(loggedInUser.id(), "USER_LOGIN", "User " + loggedInUser.username() + " (ID: " + loggedInUser.id() + ") logged in.");
+        }
+        return loggedInUser;
     }
 
     public List<user> getAllUsers() {
         return getUsers("SELECT id, username, password, identity, status FROM users ORDER BY id");
-    }
-
-    public List<user> getalltheuser() {
-        return getAllUsers();
     }
 
     public List<user> getPendingUsers() {
@@ -135,29 +141,34 @@ public class Userdao {
         return users;
     }
 
-    public boolean approveUser(int userId) {
+    public boolean approveUser(int userId, int adminId) {
         String sql = "UPDATE users SET status = 'APPROVED' WHERE id = ? AND UPPER(status) = 'PENDING'";
+        int rowsUpdated = 0;
 
+        // Connection closes here first
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, userId);
-            int rowsUpdated = stmt.executeUpdate();
-
-            if (rowsUpdated > 0) {
-                System.out.println("User ID " + userId + " has been approved.");
-                return true;
-            }
-
-            System.out.println("No pending user found with ID " + userId + ". Nothing was changed.");
-            return false;
+            rowsUpdated = stmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Error approving user: " + e.getMessage());
             return false;
         }
+
+        if (rowsUpdated > 0) {
+            System.out.println("User ID " + userId + " has been approved.");
+            // Safe log action
+            logDao.logAction(adminId, "USER_APPROVED", "Admin ID " + adminId + " approved account for User ID " + userId);
+            return true;
+        }
+
+        System.out.println("No pending user found with ID " + userId + ". Nothing was changed.");
+        return false;
     }
 
-    public boolean addUserByAdmin(String username, String password, String identity, String status) {
+    public boolean addUserByAdmin(String username, String password, String identity, String status, int adminId) {
         String sql = "INSERT INTO users(username, password, identity, status) VALUES(?, ?, ?, ?)";
+
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, username.trim());
@@ -165,58 +176,66 @@ public class Userdao {
             stmt.setString(3, identity.trim().toUpperCase());
             stmt.setString(4, status.trim().toUpperCase());
             stmt.executeUpdate();
-            return true;
         } catch (SQLException e) {
             System.err.println("Could not add user: " + e.getMessage());
             return false;
         }
+
+        // Safe log action
+        logDao.logAction(adminId, "USER_ADDED", "Admin ID " + adminId + " created new user " + username + " with role " + identity);
+        return true;
     }
 
-    // Required update method using PreparedStatement without string concatenation
-    public boolean updateUserRoleAndStatus(int userId, String newRole, String newStatus) {
+    public boolean updateUserRoleAndStatus(int userId, String newRole, String newStatus, int adminId) {
         String sql = "UPDATE users SET identity = ?, status = ? WHERE id = ?";
+        int rowsUpdated = 0;
+
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, newRole.trim().toUpperCase());
             stmt.setString(2, newStatus.trim().toUpperCase());
             stmt.setInt(3, userId);
 
-            int rowsUpdated = stmt.executeUpdate();
-            if (rowsUpdated > 0) {
-                System.out.println("User ID " + userId + " updated successfully.");
-                return true;
-            } else {
-                System.out.println("User ID not found.");
-                return false;
-            }
+            rowsUpdated = stmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Error updating user: " + e.getMessage());
             return false;
         }
-    }
 
-    public boolean updateUserStatus(int userId, String status) {
-        String sql = "UPDATE users SET status = ? WHERE id = ?";
-        try (Connection conn = ClinicdatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, status.trim().toUpperCase());
-            stmt.setInt(2, userId);
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            System.err.println("Could not update user status: " + e.getMessage());
+        if (rowsUpdated > 0) {
+            System.out.println("User ID " + userId + " updated successfully.");
+            // Safe log action
+            logDao.logAction(adminId, "USER_UPDATED", "Admin ID " + adminId + " changed role of User " + userId + " to " + newRole + " (Status: " + newStatus + ")");
+            return true;
+        } else {
+            System.out.println("User ID not found.");
             return false;
         }
     }
 
-    public boolean deleteUser(int userId) {
+    public boolean deleteUser(int userId, int adminId) {
         String sql = "DELETE FROM users WHERE id = ? AND UPPER(identity) <> 'ADMIN'";
+        boolean deleted = false;
+
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, userId);
-            return stmt.executeUpdate() > 0;
+            deleted = stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Could not delete user: " + e.getMessage());
             return false;
         }
+
+        if (deleted) {
+            // Safe log action
+            logDao.logAction(adminId, "USER_DELETED", "Admin ID " + adminId + " deleted User ID " + userId);
+        }
+        return deleted;
+    }
+
+    public boolean logClinicConsultation(int userId, String patientName, String diagnosis) {
+        String description = "Consultation recorded for patient " + patientName + " - Diagnosis: " + diagnosis;
+        System.out.println("-> " + description);
+        return logDao.logAction(userId, "CONSULTATION_LOGGED", description);
     }
 }
