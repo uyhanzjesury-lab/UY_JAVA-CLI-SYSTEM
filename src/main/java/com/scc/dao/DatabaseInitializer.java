@@ -16,13 +16,14 @@ public class DatabaseInitializer {
                 )
                 """;
 
+        // Updated with datetime('now', 'localtime') to reflect local time automatically
         String logsSql = """
                 CREATE TABLE IF NOT EXISTS activity_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
                     action_type TEXT NOT NULL,
                     description TEXT NOT NULL,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    timestamp DATETIME DEFAULT (datetime('now', 'localtime')),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """;

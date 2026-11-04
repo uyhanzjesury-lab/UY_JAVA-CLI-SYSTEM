@@ -2,18 +2,24 @@ package com.scc.dao;
 
 import com.scc.model.ActivityLog;
 import java.sql.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ActivityLogDao {
 
     public boolean logAction(int userId, String actionType, String description) {
-        String sql = "INSERT INTO activity_logs (user_id, action_type, description) VALUES (?, ?, ?)";
+
+        String currentTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        String sql = "INSERT INTO activity_logs (user_id, action_type, description, timestamp) VALUES (?, ?, ?, ?)";
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, userId);
             pstmt.setString(2, actionType.trim().toUpperCase());
             pstmt.setString(3, description.trim());
+            pstmt.setString(4, currentTimestamp);
             pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
