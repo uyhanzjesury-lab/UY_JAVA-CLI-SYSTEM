@@ -133,6 +133,7 @@ public class AccountManageMenu {
         }
     }
 
+    // --- Admin Audit Log Interface & Menu with Clear Option ---
     private void auditLogMenu() {
         boolean viewing = true;
         while (viewing) {
@@ -141,8 +142,9 @@ public class AccountManageMenu {
             System.out.println("=================================");
             System.out.println("1. View All System Logs");
             System.out.println("2. Filter Logs by User ID");
-            System.out.println("3. Back to Admin Dashboard");
-            System.out.print("Choose an option (1-3): ");
+            System.out.println("3. Clear All Audit Logs");
+            System.out.println("4. Back to Admin Dashboard");
+            System.out.print("Choose an option (1-4): ");
 
             String choice = scanner.nextLine().trim();
             switch (choice) {
@@ -151,8 +153,21 @@ public class AccountManageMenu {
                     int filterUserId = readIntInput("Enter User ID to filter by: ");
                     displayAuditLogs(logDao.getLogsByUserId(filterUserId), "LOGS FOR USER ID: " + filterUserId);
                 }
-                case "3" -> viewing = false;
-                default -> System.out.println("Invalid option. Please choose 1, 2, or 3.");
+                case "3" -> {
+                    System.out.print("Are you sure you want to delete ALL audit logs from the database? (y/n): ");
+                    String confirm = scanner.nextLine().trim();
+                    if (confirm.equalsIgnoreCase("y")) {
+                        if (logDao.clearAllLogs()) {
+                            System.out.println("-> All audit logs have been successfully cleared.");
+                        } else {
+                            System.out.println("-> Failed to clear audit logs.");
+                        }
+                    } else {
+                        System.out.println("-> Action cancelled.");
+                    }
+                }
+                case "4" -> viewing = false;
+                default -> System.out.println("Invalid option. Please choose between 1 and 4.");
             }
         }
     }
@@ -164,14 +179,14 @@ public class AccountManageMenu {
             return;
         }
 
-        System.out.printf("%-5s | %-8s | %-18s | %-35s | %-20s%n", "ID", "User ID", "Action Type", "Description", "Timestamp");
-        System.out.println("--------------------------------------------------------------------------------------------------------");
+        System.out.printf("%-5s | %-8s | %-25s | %-45s | %-20s%n", "ID", "User ID", "Action Type", "Description", "Timestamp");
+        System.out.println("-------------------------------------------------------------------------------------------------------------------------");
         for (ActivityLog log : logs) {
-            System.out.printf("%-5d | %-8d | %-18s | %-35s | %-20s%n",
+            System.out.printf("%-5d | %-8d | %-25s | %-45s | %-20s%n",
                     log.id(),
                     log.userId(),
-                    shorten(log.actionType(), 18),
-                    shorten(log.description(), 35),
+                    shorten(log.actionType(), 25),
+                    shorten(log.description(), 45),
                     shorten(log.timestamp(), 20)
             );
         }
@@ -197,7 +212,6 @@ public class AccountManageMenu {
             if (role.equals("0") || role.equals("CANCEL")) {
                 return null;
             }
-            // Added SCHOOL FACULTY STAFF validation check
             if (role.equals("STUDENT") || role.equals("TEACHER") || role.equals("ADMIN") ||
                     role.equals("NURSE") || role.equals("CLINIC STAFF") || role.equals("REGISTRAR") ||
                     role.equals("SCHOOL FACULTY STAFF")) {

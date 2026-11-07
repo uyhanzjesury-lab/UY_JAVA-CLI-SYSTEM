@@ -10,7 +10,6 @@ import java.util.List;
 public class ActivityLogDao {
 
     public boolean logAction(int userId, String actionType, String description) {
-
         String currentTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
         String sql = "INSERT INTO activity_logs (user_id, action_type, description, timestamp) VALUES (?, ?, ?, ?)";
@@ -70,5 +69,18 @@ public class ActivityLogDao {
             System.err.println("Error fetching logs for user ID " + userId + ": " + e.getMessage());
         }
         return logs;
+    }
+
+    // New method to clear all audit logs from the database
+    public boolean clearAllLogs() {
+        String sql = "DELETE FROM activity_logs";
+        try (Connection conn = ClinicdatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error clearing activity logs: " + e.getMessage());
+            return false;
+        }
     }
 }

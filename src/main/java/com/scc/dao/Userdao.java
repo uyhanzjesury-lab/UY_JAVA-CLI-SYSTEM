@@ -71,7 +71,6 @@ public class Userdao {
         String sql = "SELECT id, username, password, identity, status FROM users WHERE username = ? AND password = ?";
         user loggedInUser = null;
 
-        // Connection closes automatically here BEFORE logging
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, username.trim());
@@ -106,9 +105,11 @@ public class Userdao {
             return null;
         }
 
-        // Safe to log now because the login connection is fully closed
         if (loggedInUser != null) {
-            logDao.logAction(loggedInUser.id(), "USER_LOGIN", "User " + loggedInUser.username() + " (ID: " + loggedInUser.id() + ") logged in.");
+            // Dynamically determine Action Type based on the user's identity (e.g., LOGIN_ADMIN, LOGIN_STUDENT)
+            String actionType = "LOGIN_" + loggedInUser.identity().trim().toUpperCase().replace(" ", "_");
+            String description = "User " + loggedInUser.username() + " (" + loggedInUser.identity() + " - ID: " + loggedInUser.id() + ") logged in.";
+            logDao.logAction(loggedInUser.id(), actionType, description);
         }
         return loggedInUser;
     }
@@ -145,7 +146,6 @@ public class Userdao {
         String sql = "UPDATE users SET status = 'APPROVED' WHERE id = ? AND UPPER(status) = 'PENDING'";
         int rowsUpdated = 0;
 
-        // Connection closes here first
         try (Connection conn = ClinicdatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, userId);
@@ -157,7 +157,6 @@ public class Userdao {
 
         if (rowsUpdated > 0) {
             System.out.println("User ID " + userId + " has been approved.");
-            // Safe log action
             logDao.logAction(adminId, "USER_APPROVED", "Admin ID " + adminId + " approved account for User ID " + userId);
             return true;
         }
@@ -181,7 +180,6 @@ public class Userdao {
             return false;
         }
 
-        // Safe log action
         logDao.logAction(adminId, "USER_ADDED", "Admin ID " + adminId + " created new user " + username + " with role " + identity);
         return true;
     }
@@ -204,7 +202,6 @@ public class Userdao {
 
         if (rowsUpdated > 0) {
             System.out.println("User ID " + userId + " updated successfully.");
-            // Safe log action
             logDao.logAction(adminId, "USER_UPDATED", "Admin ID " + adminId + " changed role of User " + userId + " to " + newRole + " (Status: " + newStatus + ")");
             return true;
         } else {
@@ -227,7 +224,6 @@ public class Userdao {
         }
 
         if (deleted) {
-            // Safe log action
             logDao.logAction(adminId, "USER_DELETED", "Admin ID " + adminId + " deleted User ID " + userId);
         }
         return deleted;
